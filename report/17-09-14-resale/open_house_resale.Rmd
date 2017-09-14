@@ -1,0 +1,122 @@
+---
+title: "PDeep dive into July 2017 open house resale data"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+[Property partner](https://www.propertypartner.co/aboutus#/ourstory) is a property crowdfunding site...
+
+Data source: [open house (July 2017)](https://resources.propertypartner.co/open-house-july-2017/).
+
+```{r packages, include = FALSE}
+#install.packages("readxl")
+library(readxl)
+
+#install.packages("tidyverse")
+library(tidyverse)
+library(broom)
+library(lubridate)
+
+#install.packages("scales")
+library(scales)
+
+#install.packages("plotly")
+library(plotly)
+
+#install.packages("ggjoy")
+library(ggjoy)
+
+#install.packages("fifer")
+```
+```{r read-in-the-data, include = FALSE}
+pp_resale <- read_excel("../../data/Purchases-on-Resale-July-2017-Open-House 2.xlsx")
+
+##Look at data
+glimpse(pp_resale)
+
+summary(pp_resale)
+```
+
+```{r add-var-resales}
+pp_resale <- pp_resale %>% 
+  mutate(`Transaction (£)` = `Unit Count` * `Unit Price`) %>% 
+  mutate(Year = year(`Last Transaction`), 
+         Month = month(`Last Transaction`),
+         Week = week(`Last Transaction`), 
+         Day = day(`Last Transaction`)) %>% 
+  mutate(`Transaction size (£)` = case_when(`Transaction (£)` < 1 ~ "£0-£1",
+                                            `Transaction (£)` < 100 ~ "£1-£99",
+                                            `Transaction (£)` < 500 ~ "£100-£499",
+                                            `Transaction (£)` < 1000 ~ "£500-£999",
+                                            `Transaction (£)` < 5000 ~ "£1000-£4,999",
+                                            `Transaction (£)` < 50000 ~ "£5,000-£49,999",
+                                            `Transaction (£)` >= 50000 ~ "£50,000+") %>% 
+           factor(levels = c("£0-£1", "£1-£99", "£100-£499", "£500-£999", "£1000-£4,999", "£5,000-£49,999", "50,000+")))
+```
+- Overview of transactions
+
+```{r resales over time}
+plot_resales_over_time <- pp_resale %>% 
+  mutate(`Last Transaction` = floor_date(`Last Transaction`, unit = "month")) %>% 
+  group_by(`Last Transaction`, `Transaction type`) %>% 
+  summarise(`Transaction (£)` = sum(`Transaction (£)`)) %>% 
+  ggplot(aes(x = `Last Transaction`, y = `Transaction (£)`, fill = `Transaction type`)) +
+  geom_bar(stat = "identity") +
+  scale_y_continuous(labels = comma) + 
+  labs(title = "Property Partner Transactions") + 
+  theme_minimal() 
+
+ggplotly(plot_resales_over_time)
+```
+
+- What are the transaction sizes and how do they change over time?
+
+```{r resales over time, by size}
+plot_resales_over_time_by_size <- pp_resale %>% 
+  mutate(`Last Transaction` = floor_date(`Last Transaction`, unit = "month")) %>% 
+  group_by(`Last Transaction`, `Transaction size (£)`) %>% 
+  summarise(`Transaction (£)` = sum(`Transaction (£)`)) %>% 
+  ggplot(aes(x = `Last Transaction`, y = `Transaction (£)`, fill = `Transaction size (£)`)) +
+  geom_bar(stat = "identity") +
+  scale_y_continuous(labels = comma) + 
+  labs(title = "Property Partner Transactions; by Transaction size (£)",
+       caption = "Facetted by Transaction size (£), aggregated by month") + 
+  theme_minimal() +
+  theme(legend.position = "none") +
+  facet_wrap(~`Transaction size (£)`)
+
+ggplotly(plot_resales_over_time_by_size)
+```
+
+
+- Within each transaction size how are the distributions of transactions changing with time?
+
+```{r trans-size, warning = FALSE}
+pp_resale %>% 
+  ggplot(aes(x = `Transaction (£)`, y = factor(Year), fill = `Transaction size (£)`)) +
+  geom_joy() +
+  facet_wrap(~`Transaction size (£)`, scales = "free_x") +
+  ylab("Year") +
+  labs(title = "Distribution of transactions",
+       subtitle = "Facetted by Transaction size (£), over time") +
+  theme_minimal() +
+    theme(legend.position = "none")
+```
+
+```{r box-trans-size}
+pp_resale %>% 
+  ggplot(aes(x = factor(Year), y = `Transaction (£)`, fill = `Transaction size (£)`, colour = `Transaction size (£)`)) +
+  geom_violin(draw_quantiles = c(0.25, 0.5, 0.75), alpha = 0.2) + 
+  geom_jitter(width = 0.3, alpha = 0.01, data = sample_n(pp_resale, size = round(nrow(pp_resale)/10, digits = 0))) +
+  facet_wrap(~`Transaction size (£)`, scales = "free_x") +
+  xlab("Year") +
+  labs(title = "Distribution of transactions",
+       subtitle = "Facetted by Transaction size (£), over time",
+       caption = "Plotted points represent a 10% sample of the data") +
+  coord_flip() + 
+  theme_minimal() +
+    theme(legend.position = "none")
+```

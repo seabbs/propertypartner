@@ -1,3 +1,5 @@
 .Rproj.user
 .Rhistory
 data/
+tableau/
+.DS_Store
