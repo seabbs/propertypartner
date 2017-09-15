@@ -85,7 +85,11 @@ plot_resales_over_time <- pp_resale %>%
   scale_fill_viridis_d() +
   theme_minimal() 
 
-ggplotly(plot_resales_over_time)
+fig1 <- ggplotly(plot_resales_over_time)
+
+fig1
+
+htmlwidgets::saveWidget(fig1, file = "fig1.html", selfcontained = TRUE)
 ```
 
 The plot naturally leads to the following question - is the increase in trading volume driven by an increasing number of trades or by changes in the size of trades being made? The following plot explores this by plotting the number of transactions over time. We see that the early growth in volumes was likely driven by an increasing number of trades but that variation since then is more strongly linked to changes in trade size.
@@ -100,7 +104,12 @@ plot_no_trans_time <- pp_resale %>%
   scale_fill_viridis_d() +
   theme_minimal() 
 
-ggplotly(plot_no_trans_time)
+fig2 <- ggplotly(plot_no_trans_time)
+
+
+fig2
+
+htmlwidgets::saveWidget(fig2, file = "fig2.html", selfcontained = TRUE)
 ```
 
 Now that we understand how transactions (N) have varied with time we need to explore the underlying trends. The most obvious question is which properties are being traded for the most, and if possible why do these properties have so much turn over? The following plot shows trades by property, stratified by year. It shows that for the first year of trading a few properties (as the portfolio was small) dominated the number of trades made, in 2016 trading was spread over more properties but with fewer trades per property. So far for 2017 there has been a greatly reduced number of trades, with trading becoming increasingly homogeneous across the  portfolio. Unfortunately the extract published by Property Partner has little detail about properties so establishing why properties are traded at different rates is difficult. Whilst I could in principle join the various data sets they produce, without a unique ID this would be difficult and prone to errors!
@@ -124,7 +133,12 @@ plot_trans_by_property <- pp_resale %>%
   coord_flip() +
   facet_wrap(~Year, scales  = "free_x")
 
-ggplotly(plot_trans_by_property)
+fig3 <- ggplotly(plot_trans_by_property)
+
+
+fig3
+
+htmlwidgets::saveWidget(fig3, file = "fig3.html", selfcontained = TRUE)
 ```
 
 As the number of transactions is relatively stable, but the volume of transactions has increased, therefore size of transactions must have changed over time. To explore this I have plotted transactions (£) over time stratified by binned transaction size. As transaction size increases there is greater seasonal variation, which indicates that both large and small traders are key drivers of Property Partner's trading volume with larger trades providing the year on year growth and smaller trades acting to smooth seasonal variability. Since January 2016 there has been little growth in small trades, with larger trades becoming increasingly common. However, the largest trades (£5,000-£49,999) peaked in early 2016 since when they have been decreasing year on year (although this trend is obscured by seasonal variation).
@@ -144,13 +158,18 @@ plot_resales_over_time_by_size <- pp_resale %>%
   theme(legend.position = "none") +
   facet_wrap(~`Transaction size (£)`)
 
-ggplotly(plot_resales_over_time_by_size)
+fig4 <- ggplotly(plot_resales_over_time_by_size)
+
+
+fig4
+
+htmlwidgets::saveWidget(fig4, file = "fig4.html", selfcontained = TRUE)
 ```
 
 
 Whilst the binned transaction sizes used above were helpful in quickly visualising the changes transactions (£) by size they are arbitrary and may be obscuring underlying changes. The following plot explores this by plotting the distribution of transactions sizes within each binned transaction size. This plot contains a large amount of condensed information, the salient points are that mid-size trades (£100-£499) have shifted from being primary around £200 to being relatively equally distributed across the range, large trades (£500-£999) have become increasingly bi-model, and very high value transactions (£20,000+) have become more common as a subset of high value transactions (£5,000-£49,999).
 
-```{r trans-size, warning = FALSE}
+```{r trans-size, warning = FALSE, dpi = 500}
 pp_resale %>% 
   ggplot(aes(x = `Transaction (£)`, y = factor(Year), fill = `Transaction size (£)`)) +
   geom_joy(alpha = 0.8) +
@@ -177,7 +196,12 @@ plot_prop_trans_time <- pp_resale %>%
   facet_wrap(~`Transaction type`) +
   theme_minimal() 
 
-ggplotly(plot_prop_trans_time)
+fig5 <- ggplotly(plot_prop_trans_time)
+
+
+fig5
+
+htmlwidgets::saveWidget(fig5, file = "fig5.html", selfcontained = TRUE)
 ```
 
 
@@ -207,7 +231,12 @@ premium_prop_facet_area <- pp_resale_30_day_premium %>%
   theme(legend.position = "none",
         axis.text.x = element_text(angle = 90,hjust = 1))
 
-ggplotly(premium_prop_facet_area)
+fig6 <- ggplotly(premium_prop_facet_area)
+
+
+fig6
+
+htmlwidgets::saveWidget(fig6, file = "fig6.html", selfcontained = TRUE)
 ```
 
 To explore this apparent trend a first step is to look at the trends in premiums across the Property Partner portfolio, using the mean premium across all properties. This indicates that premiums were originally high but have decreased over time, and since the beginning of 2016 have been negative on average. As with transactions (£) seasonal dynamics now appear to dominate with premiums being relatively stable year on year.
@@ -227,7 +256,12 @@ premium_to_share <- pp_resale %>%
   theme_minimal() +
   theme(legend.position = "none")
 
-ggplotly(premium_to_share)
+fig7 <- ggplotly(premium_to_share)
+
+
+fig7
+
+htmlwidgets::saveWidget(fig7, file = "fig7.html", selfcontained = TRUE)
 ```
 
 As we have averaged across all properties in the Property Partner portfolio the relationship we have identified between year and premium may be confounded by a variety of factors. An obvious question is whether the quality of property purchased by Property Partner has changed over time (if we assume that premium over latest valuation is a good proxy of property quality). The plot below looks at the average weighted premium for properties made available for resale in each year (this is confounded by the rate properties are made available in a given year). From this plot we see that across all years of trading (except 2014) properties start with a small positive premium, which then gradually declines with time. Properties from 2014 have bucked this trend, which is likely due to the novelty of owning a property from the early days of Property Partner. Properties from 2015 have a linear relationship between premium and time, trading increasingly below their valuation. Properties from 2016 suffered a rapid reduction in premium, indicating a possible reduction in property quality, although this has now stabilised. So far properties from 2017 have held positive premiums, with little reduction over time.
@@ -254,7 +288,11 @@ premium_prop_year_entry <- pp_resale_30_day_premium %>%
   theme(legend.position = "none", 
         axis.text.x = element_text(angle = 90,hjust = 1))
 
-ggplotly(premium_prop_year_entry)
+fig8 <- ggplotly(premium_prop_year_entry)
+
+fig8 
+
+htmlwidgets::saveWidget(fig8, file = "fig8.html", selfcontained = TRUE)
 ```
 
 As a final plot for this blog post I have reproduced another plot from [this post](https://p2pblog.co.uk/property-partner-trading-analysis/) (from the [p2pblog.co.uk](https://p2pblog.co.uk/)), which is well worth a read.
@@ -275,9 +313,17 @@ prop_price_time <- pp_resale %>%
   theme_minimal() +
   theme(legend.position = "none",
         axis.text.x = element_text(angle = 90,hjust = 1)) 
-ggplotly(prop_price_time)
+fig9 <- ggplotly(prop_price_time)
+
+
+fig9
+
+htmlwidgets::saveWidget(fig9, file = "fig9.html", selfcontained = TRUE)
 ```
 
+To see the current state of the Property Partner Portfolio you can explore for youself using this Tableau dashboard,
+
+<div class='tableauPlaceholder' id='viz1505484367745' style='position: relative'><noscript><a href='#'><img alt='Property Partner Portfolio ' src='https:&#47;&#47;public.tableau.com&#47;static&#47;images&#47;Pr&#47;PropertyPartnerPortfolioVisualisation&#47;PropertyPartnerPortfolio&#47;1_rss.png' style='border: none' /></a></noscript><object class='tableauViz'  style='display:none;'><param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' /> <param name='site_root' value='' /><param name='name' value='PropertyPartnerPortfolioVisualisation&#47;PropertyPartnerPortfolio' /><param name='tabs' value='no' /><param name='toolbar' value='yes' /><param name='static_image' value='https:&#47;&#47;public.tableau.com&#47;static&#47;images&#47;Pr&#47;PropertyPartnerPortfolioVisualisation&#47;PropertyPartnerPortfolio&#47;1.png' /> <param name='animate_transition' value='yes' /><param name='display_static_image' value='yes' /><param name='display_spinner' value='yes' /><param name='display_overlay' value='yes' /><param name='display_count' value='yes' /></object></div>                <script type='text/javascript'>                    var divElement = document.getElementById('viz1505484367745');                    var vizElement = divElement.getElementsByTagName('object')[0];                    vizElement.style.width='100%';vizElement.style.height=(divElement.offsetWidth*0.75)+'px';                    var scriptElement = document.createElement('script');                    scriptElement.src = 'https://public.tableau.com/javascripts/api/viz_v1.js';                    vizElement.parentNode.insertBefore(scriptElement, vizElement);                </script>
 
 As a final note whilst it is great that Property Partner releases data this analysis was limited by the quality of the data published. If their is interest in more of these deep data dives then I would suggest contacting the peer to peer platforms that you invest in and asking that a live data extract be made available, without a login or extensive user agreement. This would ideally contain a unique ID for each loan/property etc, information on both primary and secondary market transactions, and metadata about each loan/property; such as location, type, value, etc. If you want to know more about analysis ready data then see [here](http://vita.had.co.nz/papers/tidy-data.html). 
 
