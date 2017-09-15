@@ -1,15 +1,18 @@
 ---
-title: "PDeep dive into July 2017 open house resale data"
-output: html_document
+title: "Deep Dive: Property Partner July 2017 Open House Resale Data"
+output: 
+  html_document:
+      keep_md: true
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, cache = TRUE)
 ```
 
-[Property partner](https://www.propertypartner.co/aboutus#/ourstory) is a property crowdfunding site...
+As peer to peer lending matures platforms have begun to have increasingly divergent stances on sharing their data, making it increasingly important that their is external pressure on them to improve their data sharing. This blog series will focus on platforms sharing their data, exploring what their data is saying and suggesting possible changes to their releases that would make it easier for investors to gain insights on their own.
 
-Data source: [open house (July 2017)](https://resources.propertypartner.co/open-house-july-2017/).
+For the first post I will be focussing on data from [Property Partner](https://www.propertypartner.co/aboutus#/ourstory), which is a property crowd-funding site that started in 2014 and allows investors to buy small stakes in a range of properties. The data I will be using was released as part of Property Partner's [July 2017 open house data](https://resources.propertypartner.co/open-house-july-2017/) blog, and contains information on resale's of their property portfolio. This post will reproduce and update previous work, explore the underlying trends, and suggest possible changes for future releases. All code is available [here](https://github.com/seabbs/propertypartner) and the data can be downloaded from this [link](https://d2ofd11qqzygs0.cloudfront.net/files/purchases-on-resale-july-2017-open-house.zip).
+
 
 ```{r packages, include = FALSE}
 #install.packages("readxl")
@@ -19,6 +22,7 @@ library(readxl)
 library(tidyverse)
 library(broom)
 library(lubridate)
+library(stringr)
 
 #install.packages("scales")
 library(scales)
@@ -30,8 +34,12 @@ library(plotly)
 library(ggjoy)
 
 #install.packages("fifer")
+
+#install.packages("viridis")
+library(viridis)
 ```
 ```{r read-in-the-data, include = FALSE}
+#save data from above link into data subfolder of property partner folder
 pp_resale <- read_excel("../../data/Purchases-on-Resale-July-2017-Open-House 2.xlsx")
 
 ##Look at data
@@ -54,9 +62,16 @@ pp_resale <- pp_resale %>%
                                             `Transaction (£)` < 5000 ~ "£1000-£4,999",
                                             `Transaction (£)` < 50000 ~ "£5,000-£49,999",
                                             `Transaction (£)` >= 50000 ~ "£50,000+") %>% 
-           factor(levels = c("£0-£1", "£1-£99", "£100-£499", "£500-£999", "£1000-£4,999", "£5,000-£49,999", "50,000+")))
+           factor(levels = c("£0-£1", "£1-£99", "£100-£499", "£500-£999", "£1000-£4,999", "£5,000-£49,999", "50,000+"))) %>% 
+  rowwise() %>% 
+  mutate(Area = `Property name` %>% 
+           str_split(pattern = ", ") %>% 
+           last %>% 
+           last) %>% 
+  ungroup
 ```
-- Overview of transactions
+
+As a starting point I have reproduced a graph of Transactions (£) over time first published [here](https://p2pblog.co.uk/property-partner-trading-analysis/). This shows the increase in transactions (£) over time on the resale market, with a continuous increase in volume until early 2016 from which point seasonal variation has dominated. I have also stratified by Transaction type, revealing the impact of the recently introduced bidding system, which has steadily increased it's share of transactions month on month.
 
 ```{r resales over time}
 plot_resales_over_time <- pp_resale %>% 
@@ -64,15 +79,55 @@ plot_resales_over_time <- pp_resale %>%
   group_by(`Last Transaction`, `Transaction type`) %>% 
   summarise(`Transaction (£)` = sum(`Transaction (£)`)) %>% 
   ggplot(aes(x = `Last Transaction`, y = `Transaction (£)`, fill = `Transaction type`)) +
-  geom_bar(stat = "identity") +
+  geom_bar(stat = "identity", alpha = 0.8) +
   scale_y_continuous(labels = comma) + 
-  labs(title = "Property Partner Transactions") + 
+  labs(title = "Property Partner Transactions (£)") + 
+  scale_fill_viridis_d() +
   theme_minimal() 
 
 ggplotly(plot_resales_over_time)
 ```
 
-- What are the transaction sizes and how do they change over time?
+The plot naturally leads to the following question - is the increase in trading volume driven by an increasing number of trades or by changes in the size of trades being made? The following plot explores this by plotting the number of transactions over time. We see that the early growth in volumes was likely driven by an increasing number of trades but that variation since then is more strongly linked to changes in trade size.
+
+```{r no-trans-time}
+plot_no_trans_time <- pp_resale %>% 
+  mutate(`Last Transaction` = floor_date(`Last Transaction`, unit = "month")) %>% 
+  ggplot(aes(x = `Last Transaction`, fill = `Transaction type`)) +
+  geom_bar(alpha = 0.8) +
+  scale_y_continuous(labels = comma) + 
+  labs(title = "Property Partner Transactions (N)") + 
+  scale_fill_viridis_d() +
+  theme_minimal() 
+
+ggplotly(plot_no_trans_time)
+```
+
+Now that we understand how transactions (N) have varied with time we need to explore the underlying trends. The most obvious question is which properties are being traded for the most, and if possible why do these properties have so much turn over? The following plot shows trades by property, stratified by year. It shows that for the first year of trading a few properties (as the portfolio was small) dominated the number of trades made, in 2016 trading was spread over more properties but with fewer trades per property. So far for 2017 there has been a greatly reduced number of trades, with trading becoming increasingly homogeneous across the  portfolio. Unfortunately the extract published by Property Partner has little detail about properties so establishing why properties are traded at different rates is difficult. Whilst I could in principle join the various data sets they produce, without a unique ID this would be difficult and prone to errors!
+
+```{r trans-property}
+plot_trans_by_property <- pp_resale %>% 
+  filter(Year != 2014) %>% 
+  mutate(`Last Transaction` = floor_date(`Last Transaction`, unit = "month")) %>% 
+  count(`Property name`, Year) %>% 
+  mutate(`Property name` = reorder(`Property name`, n),
+         Count = n) %>% 
+  ggplot(aes(x = `Property name`, y = Count, fill = Count)) +
+  geom_bar(stat = "identity", alpha = 0.8) +
+  scale_y_continuous(labels = comma) + 
+  labs(title = "Transactions (N) by property") + 
+  scale_fill_viridis_c()  +
+  theme_minimal() +
+  theme(legend.position = "none", 
+        axis.text.y = element_text(size = rel(0.4),hjust = 1),
+        axis.text.x = element_text(angle = 90, hjust = 1 )) +
+  coord_flip() +
+  facet_wrap(~Year, scales  = "free_x")
+
+ggplotly(plot_trans_by_property)
+```
+
+As the number of transactions is relatively stable, but the volume of transactions has increased, therefore size of transactions must have changed over time. To explore this I have plotted transactions (£) over time stratified by binned transaction size. As transaction size increases there is greater seasonal variation, which indicates that both large and small traders are key drivers of Property Partner's trading volume with larger trades providing the year on year growth and smaller trades acting to smooth seasonal variability. Since January 2016 there has been little growth in small trades, with larger trades becoming increasingly common. However, the largest trades (£5,000-£49,999) peaked in early 2016 since when they have been decreasing year on year (although this trend is obscured by seasonal variation).
 
 ```{r resales over time, by size}
 plot_resales_over_time_by_size <- pp_resale %>% 
@@ -80,10 +135,11 @@ plot_resales_over_time_by_size <- pp_resale %>%
   group_by(`Last Transaction`, `Transaction size (£)`) %>% 
   summarise(`Transaction (£)` = sum(`Transaction (£)`)) %>% 
   ggplot(aes(x = `Last Transaction`, y = `Transaction (£)`, fill = `Transaction size (£)`)) +
-  geom_bar(stat = "identity") +
+  geom_bar(stat = "identity", alpha = 0.8) +
   scale_y_continuous(labels = comma) + 
-  labs(title = "Property Partner Transactions; by Transaction size (£)",
+  labs(title = "Property Partner Transactions (£), by Transaction size (£)",
        caption = "Facetted by Transaction size (£), aggregated by month") + 
+  scale_fill_viridis_d() + 
   theme_minimal() +
   theme(legend.position = "none") +
   facet_wrap(~`Transaction size (£)`)
@@ -92,31 +148,136 @@ ggplotly(plot_resales_over_time_by_size)
 ```
 
 
-- Within each transaction size how are the distributions of transactions changing with time?
+Whilst the binned transaction sizes used above were helpful in quickly visualising the changes transactions (£) by size they are arbitrary and may be obscuring underlying changes. The following plot explores this by plotting the distribution of transactions sizes within each binned transaction size. This plot contains a large amount of condensed information, the salient points are that mid-size trades (£100-£499) have shifted from being primary around £200 to being relatively equally distributed across the range, large trades (£500-£999) have become increasingly bi-model, and very high value transactions (£20,000+) have become more common as a subset of high value transactions (£5,000-£49,999).
 
 ```{r trans-size, warning = FALSE}
 pp_resale %>% 
   ggplot(aes(x = `Transaction (£)`, y = factor(Year), fill = `Transaction size (£)`)) +
-  geom_joy() +
+  geom_joy(alpha = 0.8) +
   facet_wrap(~`Transaction size (£)`, scales = "free_x") +
   ylab("Year") +
-  labs(title = "Distribution of transactions",
+  labs(title = "Distribution of Transactions (N)",
        subtitle = "Facetted by Transaction size (£), over time") +
+  scale_fill_viridis_d() +
   theme_minimal() +
     theme(legend.position = "none")
 ```
 
-```{r box-trans-size}
-pp_resale %>% 
-  ggplot(aes(x = factor(Year), y = `Transaction (£)`, fill = `Transaction size (£)`, colour = `Transaction size (£)`)) +
-  geom_violin(draw_quantiles = c(0.25, 0.5, 0.75), alpha = 0.2) + 
-  geom_jitter(width = 0.3, alpha = 0.01, data = sample_n(pp_resale, size = round(nrow(pp_resale)/10, digits = 0))) +
-  facet_wrap(~`Transaction size (£)`, scales = "free_x") +
-  xlab("Year") +
-  labs(title = "Distribution of transactions",
-       subtitle = "Facetted by Transaction size (£), over time",
-       caption = "Plotted points represent a 10% sample of the data") +
-  coord_flip() + 
-  theme_minimal() +
-    theme(legend.position = "none")
+Another approach to visualising changing transaction size over time, is to plot the proportion of trades (by number) for each binned transaction size. As indicated in the previous plots, this shows that larger trades have become increasingly common, with the large trades (£1000-£4,999) increasing to 2% of manual trades, and  5% of matched bids in 2017. The most common trade size is still small (£1-£99), but the proportion of very small trades  (£0-£1) has drastically reduced. Matched bids are more likely to be larger transactions with small trades (£1-£99) making up 54% of transactions compared to 68% of manual orders.
+
+```{r prop-size-trans-time}
+plot_prop_trans_time <- pp_resale %>% 
+  mutate(`Last Transaction` = floor_date(`Last Transaction`, unit = "year")) %>% 
+  ggplot(aes(x = `Last Transaction`, fill = `Transaction size (£)`)) +
+  geom_bar(position = "fill", alpha = 0.8) +
+  scale_y_continuous(labels = percent) + 
+  labs(title = "Transaction (N) by size and type over time",
+       y = "Percentage") + 
+  scale_fill_viridis_d() +
+  facet_wrap(~`Transaction type`) +
+  theme_minimal() 
+
+ggplotly(plot_prop_trans_time)
 ```
+
+
+The data released by Property Partner also contains information about the unit price each transaction was made at, and what premium this was against both the latest and original valuation. As this data is provided across all properties in the portfolio a single visualisation of the data may not indicate the underling relationship. A first step is to plot the monthly average (weighted by transaction size) premium on latest valuation for each property in the portfolio, by comparing premiums on latest valuation rather than raw share price properties can be compared against each other. This plot indicates a general
+downward trend in premiums but is difficult to interpret due to the number of properties in the portfolio.
+
+```{r prem-by-prop}
+pp_resale_30_day_premium <- pp_resale %>% 
+  mutate(`Last Transaction` = floor_date(`Last Transaction`, unit = "month")) %>% 
+  mutate(`Premium to latest share valuation` = `Unit Count` * `Premium to latest share valuation`) %>% 
+  group_by(`Last Transaction`, `Property name`, Area) %>% 
+  summarise(`Premium to latest share valuation` = sum(`Premium to latest share valuation`)/sum(`Unit Count`)) %>% 
+  group_by(`Property name`) %>% 
+  mutate(`Property available for resale` = min(`Last Transaction`))
+
+premium_prop_facet_area <- pp_resale_30_day_premium %>% 
+  ggplot(aes(x = `Last Transaction`, 
+             y = `Premium to latest share valuation`,
+             colour = `Property name`,
+             group = `Property name`)) + 
+  geom_point(alpha = 0.8) +
+  geom_line() +
+  scale_y_continuous(label = percent) + 
+  scale_fill_viridis_d() +
+  labs(title = "Average Premium over Latest Valuation, for each property") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90,hjust = 1))
+
+ggplotly(premium_prop_facet_area)
+```
+
+To explore this apparent trend a first step is to look at the trends in premiums across the Property Partner portfolio, using the mean premium across all properties. This indicates that premiums were originally high but have decreased over time, and since the beginning of 2016 have been negative on average. As with transactions (£) seasonal dynamics now appear to dominate with premiums being relatively stable year on year.
+
+```{r avg-premium-to-latest-val}
+premium_to_share <- pp_resale %>% 
+  mutate(`Last Transaction` = floor_date(`Last Transaction`, unit = "month")) %>% 
+  mutate(`Premium to latest share valuation` = `Unit Count` * `Premium to latest share valuation`) %>% 
+  group_by(`Last Transaction`) %>% 
+  summarise(`Premium to latest share valuation` = sum(`Premium to latest share valuation`)/sum(`Unit Count`)) %>% 
+  ggplot(aes(x = `Last Transaction`, 
+             y = `Premium to latest share valuation`,
+             fill = `Premium to latest share valuation`)) + 
+  geom_bar(stat = "identity") +
+  scale_y_continuous(label = percent) + 
+  scale_fill_viridis_c() +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+ggplotly(premium_to_share)
+```
+
+As we have averaged across all properties in the Property Partner portfolio the relationship we have identified between year and premium may be confounded by a variety of factors. An obvious question is whether the quality of property purchased by Property Partner has changed over time (if we assume that premium over latest valuation is a good proxy of property quality). The plot below looks at the average weighted premium for properties made available for resale in each year (this is confounded by the rate properties are made available in a given year). From this plot we see that across all years of trading (except 2014) properties start with a small positive premium, which then gradually declines with time. Properties from 2014 have bucked this trend, which is likely due to the novelty of owning a property from the early days of Property Partner. Properties from 2015 have a linear relationship between premium and time, trading increasingly below their valuation. Properties from 2016 suffered a rapid reduction in premium, indicating a possible reduction in property quality, although this has now stabilised. So far properties from 2017 have held positive premiums, with little reduction over time.
+
+```{r prem-resale-entry-date}
+premium_prop_year_entry <- pp_resale_30_day_premium %>%
+  mutate(`Property available for resale` = year(`Property available for resale`) %>% 
+           as.character %>% 
+           factor) %>% 
+  group_by(`Property available for resale`, `Last Transaction`) %>% 
+  summarise(`Premium to latest share valuation` = 
+              mean(`Premium to latest share valuation`)) %>% 
+  ggplot(aes(x = `Last Transaction`, 
+             y = `Premium to latest share valuation`,
+             colour = `Property available for resale`,
+             group = `Property available for resale`)) + 
+  geom_point(alpha = 0.8) +
+  geom_line() +
+  geom_hline(yintercept = 0, linetype = 2) +
+  scale_y_continuous(label = percent) + 
+  scale_fill_viridis_d() +
+  labs(title = "Average Premium to Latest Valuation by year available for resale") +
+  theme_minimal() +
+  theme(legend.position = "none", 
+        axis.text.x = element_text(angle = 90,hjust = 1))
+
+ggplotly(premium_prop_year_entry)
+```
+
+As a final plot for this blog post I have reproduced another plot from [this post](https://p2pblog.co.uk/property-partner-trading-analysis/) (from the [p2pblog.co.uk](https://p2pblog.co.uk/)), which is well worth a read.
+
+```{r prop-share-price-over-time}
+prop_price_time <- pp_resale %>% 
+  mutate(`Last Transaction` = floor_date(`Last Transaction`, unit = "month")) %>% 
+  mutate(`Unit Price` = `Unit Count` * `Unit Price`) %>% 
+  group_by(`Last Transaction`, `Property name`) %>% 
+  summarise(`Share price (pence)` = 100 * sum(`Unit Price`)/sum(`Unit Count`)) %>%
+  ggplot(aes(x = `Last Transaction`, 
+             y = `Share price (pence)`,
+             colour = `Property name`)) + 
+  geom_point(alpha = 0.8) +
+  geom_line(aes(group = `Property name`)) +
+  scale_fill_viridis_d() +
+  labs(title = "Average share price over time for each property") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90,hjust = 1)) 
+ggplotly(prop_price_time)
+```
+
+
+As a final note whilst it is great that Property Partner releases data this analysis was limited by the quality of the data published. If their is interest in more of these deep data dives then I would suggest contacting the peer to peer platforms that you invest in and asking that a live data extract be made available, without a login or extensive user agreement. This would ideally contain a unique ID for each loan/property etc, information on both primary and secondary market transactions, and metadata about each loan/property; such as location, type, value, etc. If you want to know more about analysis ready data then see [here](http://vita.had.co.nz/papers/tidy-data.html). 
+
