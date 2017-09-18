@@ -35,6 +35,9 @@ library(ggjoy)
 
 #install.packages("viridis")
 library(viridis)
+
+#devtools::install_github("dgrtwo/gganimate")
+library(gganimate)
 ```
 ```{r read-in-the-data, include = FALSE}
 #save data from above link into data subfolder of property partner folder
@@ -162,7 +165,7 @@ fig8
 ```
 
 
-```{r}
+```{r, fig.show = "animate"}
 premium_initial_latest <- pp_resale_30_day_premium %>% 
   ggplot(aes(x = `Premium to initial share valuation`, 
              y = `Premium to latest share valuation`,
@@ -170,6 +173,7 @@ premium_initial_latest <- pp_resale_30_day_premium %>%
              group = `Property name`,
              frame = `Last Transaction`)) + 
   geom_point(alpha = 0.8) + 
+  geom_smooth(aes(group = `Last Transaction`), alpha = 0.4, method = "lm") +
   geom_hline(yintercept = 0, linetype = 2) +
   geom_vline(xintercept = 0, linetype = 2) +
   geom_abline(intercept = 0, slope = 1, linetype = 2) +
