@@ -9,7 +9,9 @@ output:
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, cache = TRUE)
 ```
 
-Previously I have looked at visualising the [Property Partner](https://www.propertypartner.co/aboutus#/ourstory) portfolio using [tableau](https://public.tableau.com/views/PropertyPartnerPortfolioVisualisation/PropertyPartnerPortfolio?:embed=y&:display_count=yes), and [explored their resale date from July 2017](https://www.samabbott.co.uk/post/deep-dive-pp-open-house/). In this post I will be exploring the [August Open House resale](https://resources.propertypartner.co/open-house-august-2017/) data focussing on property premiums over both intial and latest valuation. The code for this post is available [here](https://github.com/seabbs/propertypartner/blob/master/report/17-09-18-premium/latest_initial_premium.Rmd).
+Previously I have looked at visualising the [Property Partner](https://www.propertypartner.co/aboutus#/ourstory) portfolio using [tableau](https://public.tableau.com/views/PropertyPartnerPortfolioVisualisation/PropertyPartnerPortfolio?:embed=y&:display_count=yes), and [explored their resale date from July 2017](https://www.samabbott.co.uk/post/deep-dive-pp-open-house/). In this post I will be exploring the [August Open House resale](https://resources.propertypartner.co/open-house-august-2017/) data focussing on property premiums over both initial and latest valuation. The code for this post is available [here](https://github.com/seabbs/propertypartner/blob/master/report/17-09-18-premium/latest_initial_premium.Rmd).
+
+Property Partner advertises returns by combining both projected capital and rental returns. Properties are held for 5 years at which point any captial gain can be realised. However, Property Partner provides a secondary market which allows capital returns to be realised by selling shares to other investors. The sale price of shares is set by the market, and may or may not depend on the underlying value of the property. This post will explore the premium that sales on the secondary market set on both the initial and latest valuations of properties in the Property Partner Portfolio, and how this has changed over time. A first step is to look at premiums over time, for each property, averaged over each month.
 
 ```{r packages, include = FALSE}
 #install.packages("readxl")
@@ -71,9 +73,6 @@ pp_resale <- pp_resale %>%
   ungroup
 ```
 
-- Premiums over latest valuation
-- Premiums over initial valuation
-
 ```{r summarise-premiums}
 pp_resale_30_day_premium <- pp_resale %>% 
   mutate(`Transaction Date` = floor_date(`Last Transaction`, unit = "month")) %>% 
@@ -95,6 +94,8 @@ pp_resale_yearly_premium <- pp_resale %>%
   group_by(`Property name`) %>% 
   mutate(`Property available for resale` = min(`Transaction Date`))
 ```
+
+
 
 ```{r prem-prop-initial}
 premium_prop_initial <- pp_resale_30_day_premium %>% 
@@ -119,6 +120,8 @@ fig1
 htmlwidgets::saveWidget(fig1, file = "fig1.html", selfcontained = TRUE)
 ```
 
+From the above plot we see that in the first year of operation all properties had premiums above 0% over initial valuation, but since then several have traded with premiums that are continously negative. The majority of these properties have maintaned steady premiums over initial valuation but several have devalued in the second half of 2017. A single property (5 flats, Dutch Quarter, Colchester) has consistantly traded with a negative premium although this appears to be improving over time.
+
 ```{r prem-prop-latest}
 premium_prop_initial <- pp_resale_30_day_premium %>% 
   ggplot(aes(x = `Transaction Date`, 
@@ -141,6 +144,8 @@ fig2
 
 htmlwidgets::saveWidget(fig2, file = "fig2.html", selfcontained = TRUE)
 ```
+
+Unlike premiums over initial valuation, premiums over latest valuation appear to have decreased continously over time for the majority of properties. This indicates that premiums are not completely adjusting for increases in property value, making it unlikely that those exiting early will fully realise capital gains. Both plots indicate a relationship between premiums and the date a property was made available for resale, with properties available earlier having higher premiums over both initial and latest valuation. The above plots are hard to interpret due to the number of properties in the portfolio, therefore the next step is to summarise the data by averaging premiums across all properties.  
 
 ```{r avg-premium-to-val}
 premium_to_share <- pp_resale %>% 
@@ -178,6 +183,7 @@ fig3
 htmlwidgets::saveWidget(fig3, file = "fig3.html", selfcontained = TRUE)
 ```
 
+As we saw in the previous plots premiums over both initial and latest valuation were highest in 2015 and have since decreased. Since 2016 premiums over initial valuation appear to have stablised between 5% to 10% and premiums over latest valuation appear to have stabilised between 0% to -8%. The relationship between premiums over latest and initial valuation is summarised in the following plot.
 ```{r difference-premium-initial-latest}
 plot_diff_latest_initial_premium <- premium_to_share %>% 
   ggplot(aes(x = `Transaction Date`, 
@@ -258,9 +264,10 @@ premium_initial_latest <- pp_resale_30_day_premium %>%
   theme_minimal() +
   theme(legend.position = "none")
 
-gganimate(premium_initial_latest, title_frame = TRUE)
+gganimate(premium_initial_latest, "gif1.gif", title_frame = TRUE, ani.height = 800, ani.width = 800)
 ```
 
+![](gif1.gif)
 
 ```{r plot-latest-initial-year, fig.show = "animate"}
 premium_initial_latest_year <- pp_resale_30_day_premium %>%
@@ -288,8 +295,10 @@ premium_initial_latest_year <- pp_resale_30_day_premium %>%
   theme_minimal() +
   theme(legend.position = "bottom")
 
-gganimate(premium_initial_latest_year, title_frame = TRUE)
+gganimate(premium_initial_latest_year, "gif2.gif", title_frame = TRUE, ani.height = 800, ani.width = 800)
 ```
+
+![](gif2.gif)
 
 ```{r plot-latest-initial-area}
 premium_initial_latest_area <- pp_resale_yearly_premium %>%
@@ -358,15 +367,16 @@ premium_property_year <- pp_resale_30_day_premium %>%
   theme_minimal() +
   coord_flip() +
     theme(legend.position = "bottom",
-        axis.text.y = element_text(size = 6) 
+        axis.text.y = element_text(size = 10) 
         ) +
   facet_wrap(~`Share Valuation`, nrow = 1)
 
-gganimate(premium_property_year, title_frame = TRUE)
+gganimate(premium_property_year, "gif3.gif", title_frame = TRUE, ani.height = 1200, ani.width = 800)
 ```
 
+![](gif3.gif)
 
-```{r current-prem-property}
+```{r current-prem-property, fig.length = 20}
 premium_property_current <- pp_resale_30_day_premium %>%
   filter(`Transaction Date` == max(`Transaction Date`)) %>% 
    mutate(`Difference (initial - latest)` = 
@@ -407,5 +417,7 @@ premium_property_current <- pp_resale_30_day_premium %>%
 
 fig7
 
-htmlwidgets::saveWidget(fig7, file = "fig7.html", selfcontained = TRUE)
+htmlwidgets::saveWidget(fig7, file = "fig7.html", selfcontained = TRUE, knitrOptions = list(fig.length = 50))
 ```
+
+In a future post I will be exploring premiums further by joining the resale data used above with data on the property partner portfolio.
