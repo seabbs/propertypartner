@@ -1,5 +1,5 @@
 ---
-title: "Deep Dive: Property Partner July 2017 Open House Resale Data"
+title: "Deep Dive: Premiums on Valuation in the Property Partner Portfolio"
 output: 
   html_document:
       keep_md: true
@@ -9,8 +9,7 @@ output:
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, cache = TRUE)
 ```
 
-For the first post I will be focussing on data from [Property Partner](https://www.propertypartner.co/aboutus#/ourstory), which is a property crowd-funding site that started in 2014 and allows investors to buy small stakes in a range of properties. The data I will be using was released as part of Property Partner's [July 2017 open house data](https://resources.propertypartner.co/open-house-july-2017/) blog, and contains information on resale's of their property portfolio. This post will reproduce and update previous work, explore the underlying trends, and suggest possible changes for future releases. All code is available [here](https://github.com/seabbs/propertypartner) and the data can be downloaded from this [link](https://d2ofd11qqzygs0.cloudfront.net/files/purchases-on-resale-july-2017-open-house.zip).
-
+Previously I have looked at visualising the [Property Partner](https://www.propertypartner.co/aboutus#/ourstory) portfolio using [tableau](https://public.tableau.com/views/PropertyPartnerPortfolioVisualisation/PropertyPartnerPortfolio?:embed=y&:display_count=yes), and [explored their resale date from July 2017](https://www.samabbott.co.uk/post/deep-dive-pp-open-house/). In this post I will be exploring the [August Open House resale](https://resources.propertypartner.co/open-house-august-2017/) data focussing on property premiums over both intial and latest valuation. The code for this post is available [here](https://github.com/seabbs/propertypartner/blob/master/report/17-09-18-premium/latest_initial_premium.Rmd).
 
 ```{r packages, include = FALSE}
 #install.packages("readxl")
@@ -41,7 +40,7 @@ library(gganimate)
 ```
 ```{r read-in-the-data, include = FALSE}
 #save data from above link into data subfolder of property partner folder
-pp_resale <- read_excel("../../data/Purchases-on-Resale-July-2017-Open-House 2.xlsx")
+pp_resale <- read_excel("../../data/Purchases-on-Resale-August-2017-Open-House.xlsx")
 
 ##Look at data
 glimpse(pp_resale)
@@ -72,65 +71,135 @@ pp_resale <- pp_resale %>%
   ungroup
 ```
 
+- Premiums over latest valuation
+- Premiums over initial valuation
 
-```{r prem-by-prop}
+```{r summarise-premiums}
 pp_resale_30_day_premium <- pp_resale %>% 
-  mutate(`Last Transaction` = floor_date(`Last Transaction`, unit = "month")) %>% 
+  mutate(`Transaction Date` = floor_date(`Last Transaction`, unit = "month")) %>% 
   mutate(`Premium to latest share valuation` = `Unit Count` * `Premium to latest share valuation`,
          `Premium to initial share valuation` = `Unit Count` * `Premium to initial share valuation`) %>% 
-  group_by(`Last Transaction`, `Property name`, Area) %>% 
+  group_by(`Transaction Date`, `Property name`, Area) %>% 
   summarise(`Premium to latest share valuation` = sum(`Premium to latest share valuation`)/sum(`Unit Count`),
             `Premium to initial share valuation` = sum(`Premium to initial share valuation`)/sum(`Unit Count`)) %>% 
   group_by(`Property name`) %>% 
-  mutate(`Property available for resale` = min(`Last Transaction`))
+  mutate(`Property available for resale` = min(`Transaction Date`))
 
-premium_prop_facet_area <- pp_resale_30_day_premium %>% 
-  ggplot(aes(x = `Last Transaction`, 
+pp_resale_yearly_premium <- pp_resale %>% 
+  mutate(`Transaction Date` = floor_date(`Last Transaction`, unit = "year")) %>% 
+  mutate(`Premium to latest share valuation` = `Unit Count` * `Premium to latest share valuation`,
+         `Premium to initial share valuation` = `Unit Count` * `Premium to initial share valuation`) %>% 
+  group_by(`Transaction Date`, `Property name`, Area) %>% 
+  summarise(`Premium to latest share valuation` = sum(`Premium to latest share valuation`)/sum(`Unit Count`),
+            `Premium to initial share valuation` = sum(`Premium to initial share valuation`)/sum(`Unit Count`)) %>% 
+  group_by(`Property name`) %>% 
+  mutate(`Property available for resale` = min(`Transaction Date`))
+```
+
+```{r prem-prop-initial}
+premium_prop_initial <- pp_resale_30_day_premium %>% 
+  ggplot(aes(x = `Transaction Date`, 
              y = `Premium to initial share valuation`,
              colour = `Property name`,
              group = `Property name`)) + 
   geom_point(alpha = 0.8) +
   geom_line() +
+  geom_hline(yintercept = 0, linetype = 2, alpha = 0.4) + 
   scale_y_continuous(label = percent) + 
   scale_fill_viridis_d() +
-  labs(title = "Average Premium over Latest Valuation, for each property") +
+  labs(title = "Average Premium over initial Valuation, for each property") +
   theme_minimal() +
-  theme(legend.position = "none",
-        axis.text.x = element_text(angle = 90,hjust = 1))
+  theme(legend.position = "none") 
 
-fig6 <- ggplotly(premium_prop_facet_area)
+fig1 <- ggplotly(premium_prop_initial)
 
 
-fig6
+fig1
 
-#htmlwidgets::saveWidget(fig6, file = "fig6.html", selfcontained = TRUE)
+htmlwidgets::saveWidget(fig1, file = "fig1.html", selfcontained = TRUE)
 ```
 
+```{r prem-prop-latest}
+premium_prop_initial <- pp_resale_30_day_premium %>% 
+  ggplot(aes(x = `Transaction Date`, 
+             y = `Premium to latest share valuation`,
+             colour = `Property name`,
+             group = `Property name`)) + 
+  geom_point(alpha = 0.8) +
+  geom_line() +
+  geom_hline(yintercept = 0, linetype = 2, alpha = 0.4) + 
+  scale_y_continuous(label = percent) + 
+  scale_fill_viridis_d() +
+  labs(title = "Average Premium over latest Valuation, for each property") +
+  theme_minimal() +
+  theme(legend.position = "none") 
 
-```{r avg-premium-to-latest-val}
+fig2 <- ggplotly(premium_prop_initial)
+
+
+fig2
+
+htmlwidgets::saveWidget(fig2, file = "fig2.html", selfcontained = TRUE)
+```
+
+```{r avg-premium-to-val}
 premium_to_share <- pp_resale %>% 
-  mutate(`Last Transaction` = floor_date(`Last Transaction`, unit = "month")) %>% 
+  mutate(`Transaction Date` = floor_date(`Last Transaction`, unit = "month")) %>% 
   mutate(`Premium to latest share valuation` = `Unit Count` * `Premium to latest share valuation`,
          `Premium to initial share valuation` = `Unit Count` * `Premium to initial share valuation`) %>% 
-  group_by(`Last Transaction`) %>% 
+  group_by(`Transaction Date`) %>% 
   summarise(`Premium to latest share valuation` = sum(`Premium to latest share valuation`)/sum(`Unit Count`),
             `Premium to initial share valuation` = sum(`Premium to initial share valuation`)/sum(`Unit Count`)) %>% 
-  ggplot(aes(x = `Last Transaction`, 
-             y = `Premium to initial share valuation`,
-             fill = `Premium to initial share valuation`)) + 
+  mutate(`Difference between premium based on initial vs. latest share valuation` = 
+           `Premium to initial share valuation` -
+           `Premium to latest share valuation`
+           ) %>% 
+   gather(key = "Share Valuation", value = "Premium",
+         `Premium to initial share valuation`,
+         `Premium to latest share valuation`)
+
+plot_premium_to_share <- premium_to_share %>% 
+  ggplot(aes(x = `Transaction Date`, 
+             y = Premium,
+             fill = Premium)) + 
   geom_bar(stat = "identity") +
   scale_y_continuous(label = percent) + 
   scale_fill_viridis_c() +
+  labs(title = "Average Premium over Share Valuation") + 
+  theme_minimal() +
+  theme(legend.position = "none") + 
+  facet_wrap(~`Share Valuation`, ncol = 1)
+
+fig3 <- ggplotly(plot_premium_to_share)
+
+
+fig3
+
+htmlwidgets::saveWidget(fig3, file = "fig3.html", selfcontained = TRUE)
+```
+
+```{r difference-premium-initial-latest}
+plot_diff_latest_initial_premium <- premium_to_share %>% 
+  ggplot(aes(x = `Transaction Date`, 
+             y = `Difference between premium based on initial vs. latest share valuation`,
+             fill = `Difference between premium based on initial vs. latest share valuation`)) + 
+  geom_bar(stat = "identity") +
+  scale_y_continuous(label = percent) + 
+  scale_fill_viridis_c() +
+  labs(title = "Difference in Premiums",
+       y = "Difference in Premiums (Initial - Latest)") + 
   theme_minimal() +
   theme(legend.position = "none")
 
-fig7 <- ggplotly(premium_to_share)
+fig4 <- ggplotly(plot_diff_latest_initial_premium)
 
 
-fig7
+fig4
 
-#htmlwidgets::saveWidget(fig7, file = "fig7.html", selfcontained = TRUE)
+htmlwidgets::saveWidget(fig4, file = "fig4.html", selfcontained = TRUE)
 ```
+
+
 
 
 ```{r prem-resale-entry-date}
@@ -138,53 +207,205 @@ premium_prop_year_entry <- pp_resale_30_day_premium %>%
   mutate(`Property available for resale` = year(`Property available for resale`) %>% 
            as.character %>% 
            factor) %>% 
-  group_by(`Property available for resale`, `Last Transaction`) %>% 
+  group_by(`Property available for resale`,
+           `Transaction Date`) %>% 
   summarise(`Premium to latest share valuation` = 
               mean(`Premium to latest share valuation`),
             `Premium to initial share valuation` = 
               mean(`Premium to initial share valuation`)) %>% 
-  ggplot(aes(x = `Last Transaction`, 
-             y = `Premium to initial share valuation`,
-             colour = `Property available for resale`,
-             group = `Property available for resale`)) + 
+  gather(key = "Share Valuation", value = "Premium",
+         `Premium to initial share valuation`,
+         `Premium to latest share valuation`) %>% 
+  ggplot(aes(x = `Transaction Date`, 
+             y = Premium,
+             colour = `Property available for resale`)) + 
   geom_point(alpha = 0.8) +
-  geom_line() +
+  geom_line(aes(group = `Property available for resale`)) +
   geom_hline(yintercept = 0, linetype = 2) +
   scale_y_continuous(label = percent) + 
   scale_fill_viridis_d() +
   labs(title = "Average Premium to Latest Valuation by year available for resale") +
   theme_minimal() +
-  theme(legend.position = "none", 
-        axis.text.x = element_text(angle = 90,hjust = 1))
+  theme(legend.position = "none") +
+    facet_wrap(~`Share Valuation`)
 
-fig8 <- ggplotly(premium_prop_year_entry)
+fig5 <- ggplotly(premium_prop_year_entry)
 
-fig8 
+fig5 
 
-#htmlwidgets::saveWidget(fig8, file = "fig8.html", selfcontained = TRUE)
+htmlwidgets::saveWidget(fig5, file = "fig5.html", selfcontained = TRUE)
 ```
 
 
-```{r, fig.show = "animate"}
+```{r plot-latest-initial, fig.show = "animate"}
 premium_initial_latest <- pp_resale_30_day_premium %>% 
   ggplot(aes(x = `Premium to initial share valuation`, 
              y = `Premium to latest share valuation`,
              colour = `Property name`,
              group = `Property name`,
-             frame = `Last Transaction`)) + 
+             frame = `Transaction Date`)) + 
   geom_point(alpha = 0.8) + 
-  geom_smooth(aes(group = `Last Transaction`), alpha = 0.4, method = "lm") +
-  geom_hline(yintercept = 0, linetype = 2) +
-  geom_vline(xintercept = 0, linetype = 2) +
-  geom_abline(intercept = 0, slope = 1, linetype = 2) +
+  geom_smooth(aes(group = `Transaction Date`), alpha = 0.2, method = "lm", colour = "#440154CC") +
+  geom_hline(yintercept = 0, linetype = 2, alpha = 0.5) +
+  geom_vline(xintercept = 0, linetype = 2, alpha = 0.5) +
+  geom_abline(intercept = 0, slope = 1, linetype = 2, alpha = 0.5) +
   scale_y_continuous(label = percent) + 
   scale_x_continuous(label = percent) + 
   scale_fill_viridis_d() +
-  labs(title = "Latest vs. Initial Premium") +
+  labs(title = "Property Partner Secondary Market",
+    subtitle = "Premium on Latest vs. Initial Valuation",
+    caption = "Each colour represents a single property in the property partner portfolio. The solid line indicates the linear trend at  a given time.") +
   theme_minimal() +
-  theme(legend.position = "none",
-        axis.text.x = element_text(angle = 90,hjust = 1))
+  theme(legend.position = "none")
 
 gganimate(premium_initial_latest, title_frame = TRUE)
-````
+```
 
+
+```{r plot-latest-initial-year, fig.show = "animate"}
+premium_initial_latest_year <- pp_resale_30_day_premium %>%
+  mutate(`Property available for resale` = year(`Property available for resale`) %>% 
+           factor(ordered = TRUE)) %>% 
+  ggplot(aes(x = `Premium to initial share valuation`, 
+             y = `Premium to latest share valuation`,
+             colour = `Property available for resale`,
+             group = `Property available for resale`,
+             text = `Property name`,
+             frame = `Transaction Date`)) + 
+  geom_point(alpha = 0.8) + 
+  geom_smooth(aes(group = interaction(`Property available for resale`, `Transaction Date`)), 
+              alpha = 0.2, method = "lm", se = FALSE) +
+  geom_hline(yintercept = 0, linetype = 2, alpha = 0.5) +
+  geom_vline(xintercept = 0, linetype = 2, alpha = 0.5) +
+  geom_abline(intercept = 0, slope = 1, 
+              linetype = 2, alpha = 0.5) +
+  scale_y_continuous(label = percent) + 
+  scale_x_continuous(label = percent) + 
+  scale_fill_viridis_d() +
+  labs(title = "Property Partner Secondary Market",
+    subtitle = "Premium on Latest vs. Initial Valuation",
+    caption = "Each colour represents a single property in the property partner portfolio. The solid line indicates the linear trend at  a given time.") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+gganimate(premium_initial_latest_year, title_frame = TRUE)
+```
+
+```{r plot-latest-initial-area}
+premium_initial_latest_area <- pp_resale_yearly_premium %>%
+  mutate(`Transaction Date` = year(`Transaction Date`)) %>%
+  ggplot(aes(x = `Premium to initial share valuation`, 
+             y = `Premium to latest share valuation`,
+             colour = Area,
+             text = `Property name`)) + 
+  geom_point(alpha = 0.8) + 
+  geom_hline(yintercept = 0, linetype = 2, alpha = 0.5) +
+  geom_vline(xintercept = 0, linetype = 2, alpha = 0.5) +
+  geom_abline(intercept = 0, slope = 1, linetype = 2, alpha = 0.5) +
+  scale_y_continuous(label = percent) + 
+  scale_x_continuous(label = percent) + 
+  scale_fill_viridis_d() +
+  labs(title = "Property Partner Secondary Market",
+    subtitle = "Premium on Latest vs. Initial Valuation",
+    caption = "Each colour represents a single property in the property partner portfolio. The solid line indicates the linear trend at  a given time.") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  facet_wrap(~`Transaction Date`)
+
+fig6 <- ggplotly(premium_initial_latest_area)
+
+fig6
+
+htmlwidgets::saveWidget(fig6, file = "fig6.html", selfcontained = TRUE)
+```
+
+```{r premium_by_property, fig.show = "animate", fig.height = 15}
+order_properties_by_resale <- pp_resale_30_day_premium %>% 
+                    group_by(`Property name`) %>%
+                    filter(`Transaction Date` == min(`Transaction Date`)) %>%
+                    arrange(desc(`Transaction Date`)) %>% 
+                    pull(`Property name`)
+
+premium_property_year <- pp_resale_30_day_premium %>%
+   mutate(`Difference (initial - latest)` = 
+           `Premium to initial share valuation` -
+           `Premium to latest share valuation`
+           ) %>%
+  ungroup %>% 
+  mutate(`Property name` = `Property name` %>% 
+           factor(levels = order_properties_by_resale)
+  ) %>%
+  rename(`Difference (Initial - Latest)` = 
+           `Difference (initial - latest)`,
+         Initial = `Premium to initial share valuation`,
+         Latest = `Premium to latest share valuation`) %>% 
+   gather(key = "Share Valuation", value = "Premium",
+         Initial,
+         Latest,
+         `Difference (Initial - Latest)`) %>% 
+  mutate(`Property available for resale` = `Property available for resale` %>% 
+           year %>% 
+           factor(ordered = TRUE)) %>% 
+  ggplot(aes(x = `Property name`, 
+             y = Premium,
+             text = Area,
+             fill = `Property available for resale`,
+             frame = `Transaction Date`)) + 
+  geom_bar(stat = "identity", position = "dodge", alpha = 0.8) +
+  scale_y_continuous(label = percent) + 
+  scale_fill_viridis_d() +
+  labs(title = "Premium on Initial vs Latest Valuation") + 
+  theme_minimal() +
+  coord_flip() +
+    theme(legend.position = "bottom",
+        axis.text.y = element_text(size = 6) 
+        ) +
+  facet_wrap(~`Share Valuation`, nrow = 1)
+
+gganimate(premium_property_year, title_frame = TRUE)
+```
+
+
+```{r current-prem-property}
+premium_property_current <- pp_resale_30_day_premium %>%
+  filter(`Transaction Date` == max(`Transaction Date`)) %>% 
+   mutate(`Difference (initial - latest)` = 
+           `Premium to initial share valuation` -
+           `Premium to latest share valuation`
+           ) %>%
+  ungroup %>% 
+  mutate(`Property name` = `Property name` %>% 
+           factor(levels = order_properties_by_resale)
+  ) %>%
+  rename(`Difference (Initial - Latest)` = 
+           `Difference (initial - latest)`,
+         Initial = `Premium to initial share valuation`,
+         Latest = `Premium to latest share valuation`) %>% 
+   gather(key = "Share Valuation", value = "Premium",
+         Initial,
+         Latest,
+         `Difference (Initial - Latest)`) %>% 
+  mutate(`Property available for resale` = `Property available for resale` %>% 
+           year %>% 
+           factor(ordered = TRUE)) %>% 
+  ggplot(aes(x = `Property name`, 
+             y = Premium,
+             text = Area,
+             fill = `Property available for resale`)) + 
+  geom_bar(stat = "identity", position = "dodge", alpha = 0.8) +
+  scale_y_continuous(label = percent) + 
+  scale_fill_viridis_d() +
+  labs(title = "Current Premium on Initial vs Latest Valuation") +
+  coord_flip() +
+  theme_minimal() +
+    theme(legend.position = "bottom",
+        axis.text.y = element_text(size = 6) 
+        ) +
+  facet_wrap(~`Share Valuation`, nrow = 1)
+  
+  fig7 <- ggplotly(premium_property_current)
+
+fig7
+
+htmlwidgets::saveWidget(fig7, file = "fig7.html", selfcontained = TRUE)
+```
